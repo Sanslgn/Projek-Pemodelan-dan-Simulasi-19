@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Simulasi Prediksi Volume Sampah Kota Binjai</title>
+  <link rel="stylesheet" href="style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+  <div id="customAlert" style="display:none; 
+    position: fixed; top: 20px; left: 50%; transform: translateX(-50%);
+    background-color: #aaa7f6; color: white; padding: 15px 30px; border-radius: 5px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.2); font-weight: bold; z-index: 1000;">
+    Simulasi berhasil dijalankan. Silakan pilih output yang ingin ditampilkan.
+  </div>
+
+  <div class="container">
+    <header>
+      <h1>Simulasi Produksi Volume Sampah</h1>
+      <p>Berbasis Sistem Dinamik - Studi Kasus Kota Binjai</p>
+    </header>
+
+    <section>
+      <ul>
+🔧 Cara Kerja Sistem:
+      <li>Input Paramater : Pengguna memasukkan parameter seperti jumlah penduduk awal, tingkat kelahiran, kematian, imigrasi, dan emigasi, serta produksi sampah per kapita.</li>
+      <li>Simulasi        : Sistem menghitung pertumbuhan penduduk setiap tahun, volume sampah yang dihasilkan, serta volume yang bisa diolah dan sisa yang harus ditimbun.</li>
+      <li>Output visual   : Hasil simulasi ditampilkan dalam bentuk grafik dan tabel, memudahkan analisis kebutuhan lahan TPA dan efektivitas kebijakan.</li>
+    </ul>
+    </section>
+
+  <form id="simulasiForm" class="container my-4">
+  <!-- Parameter Penduduk -->
+    <h3 class="fw-bold text-dark mb-3">Parameter Penduduk</h3>
+      <div class="row-3">
+        <div class="col-md-4">
+          <label for="pendudukAwal" class="form-label">Jumlah Penduduk Awal</label>
+          <input type="number" id="pendudukAwal" class="form-control" value="303272" required>
+        </div>
+        <div class="col-md-4">
+          <label for="kelahiran" class="form-label">Tingkat Kelahiran (%/thn)</label>
+          <input type="number" id="kelahiran" class="form-control" value="1.2" step="0.1" required>
+        </div>
+        <div class="col-md-4">
+          <label for="kematian" class="form-label">Tingkat Kematian (%/thn)</label>
+          <input type="number" id="kematian" class="form-control" value="0.5" step="0.1" required>
+        </div>
+      </div>
+      <div class="row mb-4">
+        <div class="col-md-4">
+          <label for="imigrasi" class="form-label">Imigrasi (%/thn)</label>
+          <input type="number" id="imigrasi" class="form-control" value="0.3" step="0.1" required>
+        </div>
+        <div class="col-md-4">
+          <label for="emigrasi" class="form-label">Emigrasi (%/thn)</label>
+          <input type="number" id="emigrasi" class="form-control" value="0.2" step="0.1" required>
+        </div>
+      </div>
+
+      <!-- Parameter Sampah & TPA -->
+      <h3 class="fw-bold text-dark mb-3">Parameter Sampah & TPA</h3>
+      <div class="row mb-3">
+        <div class="col-md-4">
+          <label for="sampahPerKapita" class="form-label">Sampah per Kapita (kg/hari)</label>
+          <input type="number" id="sampahPerKapita" class="form-control" value="0.7" step="0.01" required>
+        </div>
+        <div class="col-md-4">
+          <label for="kepadatan" class="form-label">Kepadatan Sampah (kg/m³)</label>
+          <input type="number" id="kepadatan" class="form-control" value="100000" required>
+        </div>
+        <div class="col-md-4">
+          <label for="tinggiTPA" class="form-label">Tinggi TPA (meter)</label>
+          <input type="number" id="tinggiTPA" class="form-control" value="10" required>
+        </div>
+      </div>
+      <div class="row mb-4">
+        <div class="col-md-4">
+          <label for="luasAwalTPA" class="form-label">Luas TPA Awal (m²)</label>
+          <input type="number" id="luasAwalTPA" class="form-control" value="200000" required>
+        </div>
+      </div>
+
+      <!-- Periode Simulasi -->
+      <h3 class="fw-bold text-dark mb-3">Periode Simulasi</h3>
+      <div class="row mb-4">
+        <div class="col-md-4">
+          <label for="tahunAwal" class="form-label">Tahun Awal</label>
+          <input type="number" id="tahunAwal" class="form-control" value="2026" required>
+        </div>
+        <div class="col-md-4">
+          <label for="tahunAkhir" class="form-label">Tahun Akhir</label>
+          <input type="number" id="tahunAkhir" class="form-control" value="2050" required>
+        </div>
+      </div>
+
+      <!-- Tombol -->
+      <div class="row mb-4">
+        <div class="col-md-4">
+          <button type="submit" class="btn btn-success px-4 py-2">Jalankan Simulasi</button>
+        </div>
+      </div>
+  </form>
+
+    <hr/>
+
+    <canvas id="chartPenduduk" class="mb-4"></canvas>
+    <canvas id="chartSampah" class="mb-4"></canvas>
+    <canvas id="chartTPA" class="mb-4"></canvas>
+
+    <div id="tabelContainer"></div>
+  </div>
+
+<script>
+  const form = document.getElementById('simulasiForm');
+  const alertBox = document.getElementById('customAlert');
+  const tabelContainer = document.getElementById('tabelContainer');
+
+  let chartPenduduk, chartSampah, chartTPA;
+
+  form.addEventListener('submit', function(e) {
+    e.preventDefault();
+
+    // Ambil nilai input
+    const pendudukAwal = Number(document.getElementById('pendudukAwal').value);
+    const kelahiran = Number(document.getElementById('kelahiran').value) / 100;
+    const kematian = Number(document.getElementById('kematian').value) / 100;
+    const imigrasi = Number(document.getElementById('imigrasi').value) / 100;
+    const emigrasi = Number(document.getElementById('emigrasi').value) / 100;
+
+    const sampahPerKapita = Number(document.getElementById('sampahPerKapita').value);
+    const kepadatan = Number(document.getElementById('kepadatan').value);
+    const tinggiTPA = Number(document.getElementById('tinggiTPA').value);
+    const luasAwalTPA = Number(document.getElementById('luasAwalTPA').value);
+
+    const tahunAwal = Number(document.getElementById('tahunAwal').value);
+    const tahunAkhir = Number(document.getElementById('tahunAkhir').value);
+
+    if (tahunAkhir <= tahunAwal) {
+      alert('Tahun Akhir harus lebih besar dari Tahun Awal');
+      return;
+    }
+
+    const tahun = [];
+    const penduduk = [];
+    const volumeSampah = [];
+    const luasTPA = [];
+
+    let pendudukSekarang = pendudukAwal;
+    let totalVolumeKgAkumulasi = 0;
+
+    for (let th = tahunAwal; th <= tahunAkhir; th++) {
+      tahun.push(th);
+
+      const lahir = pendudukSekarang * kelahiran;
+      const mati = pendudukSekarang * kematian;
+      const masuk = pendudukSekarang * imigrasi;
+      const keluar = pendudukSekarang * emigrasi;
+
+      pendudukSekarang = pendudukSekarang + lahir + masuk - mati - keluar;
+      pendudukSekarang = Math.max(0, pendudukSekarang);
+      penduduk.push(pendudukSekarang);
+
+      const volSampah = sampahPerKapita * pendudukSekarang * 365;
+      volumeSampah.push(volSampah);
+
+      totalVolumeKgAkumulasi += volSampah;
+      const totalVolumeM3 = totalVolumeKgAkumulasi / kepadatan;
+      const luasButuh = totalVolumeM3 / tinggiTPA;
+      luasTPA.push(luasButuh);
+    }
+
+    let tabelHTML = `<h3>Hasil Simulasi</h3>
+      <table border="1" cellpadding="5" cellspacing="0" style="border-collapse: collapse; width: 100%; max-width: 800px;">
+        <thead>
+          <tr>
+            <th>Tahun</th>
+            <th>Jumlah Penduduk</th>
+            <th>Volume Sampah (kg/tahun)</th>
+            <th>Luas TPA yang Dibutuhkan (m²)</th>
+          </tr>
+        </thead>
+        <tbody>`;
+
+    for (let i = 0; i < tahun.length; i++) {
+      tabelHTML += `
+        <tr>
+          <td>${tahun[i]}</td>
+          <td>${penduduk[i].toFixed(0)}</td>
+          <td>${volumeSampah[i].toFixed(0)}</td>
+          <td>${luasTPA[i].toFixed(2)}</td>
+        </tr>`;
+    }
+    tabelHTML += `</tbody></table>`;
+    tabelContainer.innerHTML = tabelHTML;
+
+    function buatChart(ctx, label, data, color) {
+      return new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: tahun,
+          datasets: [{
+            label: label,
+            data: data,
+            borderColor: color,
+            backgroundColor: 'transparent',
+            fill: true,
+            tension: 0.2,
+          }]
+        },
+        options: {
+          responsive: true,
+          scales: {
+            y: { beginAtZero: true }
+          }
+        }
+      });
+    }
+
+    if (chartPenduduk) chartPenduduk.destroy();
+    if (chartSampah) chartSampah.destroy();
+    if (chartTPA) chartTPA.destroy();
+
+    chartPenduduk = buatChart(document.getElementById('chartPenduduk').getContext('2d'), 'Jumlah Penduduk', penduduk, 'blue');
+    chartSampah = buatChart(document.getElementById('chartSampah').getContext('2d'), 'Volume Sampah (kg/tahun)', volumeSampah, 'green');
+    chartTPA = buatChart(document.getElementById('chartTPA').getContext('2d'), 'Luas TPA yang Dibutuhkan (m²)', luasTPA, 'orange');
+
+    alertBox.style.display = 'block';
+    setTimeout(() => {
+      alertBox.style.display = 'none';
+    }, 4000);
+
+    let totalVolumeKg = volumeSampah.reduce((a, b) => a + b, 0);
+    let totalVolumeM3 = totalVolumeKg / kepadatan;
+    let totalLuasButuh = totalVolumeM3 / tinggiTPA;
+    let sisaLahan = luasAwalTPA - totalLuasButuh;
+
+    const volumeInfo = document.createElement('div');
+    volumeInfo.style.marginTop = '20px';
+    volumeInfo.style.borderTop = '1px solid #ccc';
+    volumeInfo.style.paddingTop = '10px';
+    volumeInfo.innerHTML = `
+      <h3>Ringkasan Kebutuhan Lahan TPA</h3>
+      <ul>
+        <li><strong>Total Volume Sampah:</strong> ${totalVolumeKg.toFixed(0)} kg (${totalVolumeM3.toFixed(0)} m³)</li>
+        <li><strong>Total Luas TPA yang Dibutuhkan:</strong> ${totalLuasButuh.toFixed(2)} m² (${(totalLuasButuh / 10000).toFixed(2)} Ha)</li>
+        <li><strong>Luas TPA Awal:</strong> ${luasAwalTPA.toFixed(0)} m² (${(luasAwalTPA / 10000).toFixed(2)} Ha)</li>
+        <li><strong>Sisa Lahan TPA di Tahun ${tahunAkhir}:</strong> ${sisaLahan.toFixed(2)} m² (${(sisaLahan / 10000).toFixed(2)} Ha)</li>
+      </ul>
+    `;
+
+    if (sisaLahan < 0) {
+      volumeInfo.innerHTML += `<p style="color:red"><strong>⚠️ Peringatan:</strong> Lahan TPA tidak mencukupi. Perlu ekspansi sebesar ${(Math.abs(sisaLahan) / 10000).toFixed(2)} Ha.</p>`;
+    }
+
+    tabelContainer.appendChild(volumeInfo);
+  });
+</script>
+
+</body>
+</html>
